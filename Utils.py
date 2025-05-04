@@ -1,13 +1,29 @@
 import math
 from collections import Counter
-import scipy
-from scipy.sparse import lil_matrix, csr_matrix
 import pandas as pd
 import sklearn
 from sklearn import *
 import numpy as np
 import os
 import joblib
+# from gensim.utils import simple_preprocess
+from nltk.corpus import stopwords
+import sys
+import scipy
+import scipy.linalg
+from scipy.sparse import lil_matrix, csr_matrix
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy import sparse
+from scipy.sparse import hstack
+
+
+if not hasattr(scipy.linalg, 'triu'):
+    def triu(m, k=0):
+        m = np.asanyarray(m)
+        mask = np.tri(m.shape[0], m.shape[1], k=k, dtype=bool)
+        return np.where(mask, m, 0)
+
+    scipy.linalg.triu = triu
 
 ################# Existing methods from the deliverable notebook startup:
 def cast_list_as_strings(mylist):
@@ -170,5 +186,66 @@ def load_model(path="models", filename="model.pkl"):
     model = joblib.load(full_path)
     print(f"Model loaded from {full_path}")
     return model
+
+
+def check_model_saved(path="models", filename="model.pkl"):
+    model_path = os.path.join(path, filename)
+    return os.path.isfile(filename)
+
+
+def clean_text(text):
+    return str(text).lower().strip()
+
+
+def char_ngram_similarity(q1, q2, vectorizer):
+    q1, q2 = clean_text(q1), clean_text(q2)
+    tfidf = vectorizer.transform([q1, q2])
+    return cosine_similarity(tfidf[0], tfidf[1])[0][0]
+
+
+def starts_with_indicator(text):
+    text = str(text).strip().lower()
+    return {f"starts_with_{word}": int(text.startswith(word)) for word in start_words}
+
+start_words = ['how', 'can', 'what', 'why', 'are', 'do', 'does', 'is', 'should', 'could']
+
+def jaccard_similarity(q1, q2):
+    # Tokenize the text into sets of words
+    set_q1 = set(str(q1).lower().split())
+    set_q2 = set(str(q2).lower().split())
+    
+    # Calculate Jaccard similarity
+    intersection = len(set_q1 & set_q2)  # common words
+    union = len(set_q1 | set_q2)         # all unique words
+    return intersection / union if union != 0 else 0  # Avoid division by zero
+
+
+# For use with LDA and LSI, but can't make versions of gensim, numpy and scipy work together.....
+
+# def gensim_preprocess_en(texts):
+#     stop_words = set(stopwords.words('english'))
+#     return [
+#         [word for word in simple_preprocess(doc) if word not in stop_words]
+#         for doc in texts
+#     ]
+
+
+# def get_embedding(model, dictionary, text):
+#     bow = dictionary.doc2bow(text)
+#     topic_dist = model[bow]
+#     dense_vector = np.zeros(model.num_topics)
+#     for idx, val in topic_dist:
+#         dense_vector[idx] = val
+#     return dense_vector
+
+
+# def compute_similarity_features(q1_list, q2_list, model, dictionary):
+#     features = []
+#     for q1, q2 in zip(q1_list, q2_list):
+#         q1_vec = get_embedding(model, dictionary, q1)
+#         q2_vec = get_embedding(model, dictionary, q2)
+#         sim = cosine_similarity_vectors([q1_vec], [q2_vec])[0][0]
+#         features.append(sim)
+#     return np.array(features).reshape(-1, 1)
 
 ######################### New methods (Alana):

@@ -7,14 +7,20 @@ import numpy as np
 import os
 import joblib
 # from gensim.utils import simple_preprocess
-from nltk.corpus import stopwords
+#from gensim.models import Word2Vec
+#from nltk.corpus import stopwords
 import sys
 import scipy
 import scipy.linalg
-from scipy.sparse import lil_matrix, csr_matrix
+from scipy.sparse import lil_matrix, csr_matrix, hstack
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import accuracy_score
 from scipy import sparse
 from scipy.sparse import hstack
+from xgboost import XGBClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+
 
 
 if not hasattr(scipy.linalg, 'triu'):
@@ -35,6 +41,7 @@ def cast_list_as_strings(mylist):
         mylist_of_strings.append(str(x))
 
     return mylist_of_strings
+
 
 
 def get_features_from_df(df, count_vectorizer):
@@ -218,6 +225,31 @@ def jaccard_similarity(q1, q2):
     intersection = len(set_q1 & set_q2)  # common words
     union = len(set_q1 | set_q2)         # all unique words
     return intersection / union if union != 0 else 0  # Avoid division by zero
+
+
+def avg_embedding(text, model, size):
+    words = text.lower().split()
+    vecs = [model.wv[word] for word in words if word in model.wv]
+    if not vecs:
+        return np.zeros(size)
+    return np.mean(vecs, axis=0)
+
+# Create Word2Vec features for a dataframe
+def create_w2v_features(q1,q2, model, size):
+    emb1 = np.vstack(q1.apply(lambda x: avg_embedding(x, model, size)).values)
+    emb2 = np.vstack(q2.apply(lambda x: avg_embedding(x, model, size)).values)
+    return np.hstack([emb1, emb2])
+
+def create_tfidf_features(q1,q2, vectorizer):
+    v1 = vectorizer.transform(q1)
+    v2 = vectorizer.transform(q2)
+    return scipy.sparse.hstack([v1, v2])
+
+def texts_to_padded(q1,q2,tokenizer, max_len):
+    seq1 = tokenizer.texts_to_sequences(q1)
+    seq2 = tokenizer.texts_to_sequences(q2)
+    return pad_sequences(seq1, maxlen=max_len), pad_sequences(seq2, maxlen=max_len)
+
 
 
 # For use with LDA and LSI, but can't make versions of gensim, numpy and scipy work together.....
